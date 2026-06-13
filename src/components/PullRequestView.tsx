@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { VulnerabilityScenario } from '../data/vulnerabilities';
 import { DiffViewer } from './DiffViewer';
+import { AttackReplay } from './AttackReplay';
 
 interface PullRequestViewProps {
   scenario: VulnerabilityScenario;
@@ -39,7 +40,7 @@ export const PullRequestView: React.FC<PullRequestViewProps> = ({
       if (line.startsWith('`') && line.endsWith('`')) {
         return <code key={index} style={{ display: 'block', backgroundColor: 'var(--bg-surface)', padding: '10px', borderRadius: '4px', border: '1px solid var(--outline-variant)', margin: '8px 0', fontSize: '0.8rem' }}>{line.replace(/`/g, '')}</code>;
       }
-      if (line.startsWith('\`\`\`')) {
+      if (line.startsWith('```')) {
         return null; // Skip markdown block markers in simple parser
       }
       return <p key={index} style={{ color: 'var(--text-secondary)', margin: '6px 0', lineHeight: 1.5, fontSize: '0.875rem' }}>{line}</p>;
@@ -142,31 +143,12 @@ export const PullRequestView: React.FC<PullRequestViewProps> = ({
             </div>
 
             {scenario.pocExploit && (
-              <div className="glass-panel" style={{ padding: '20px', borderLeft: '4px solid var(--tertiary)', background: 'rgba(255, 184, 105, 0.02)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--outline-variant)', paddingBottom: '10px', marginBottom: '14px' }}>
-                  <span style={{ fontSize: '1.1rem' }}>💥</span>
-                  <strong style={{ fontSize: '0.85rem' }}>Attacker's Proof-of-Concept Exploit (Auditor Report)</strong>
-                  <span className="badge badge-red" style={{ fontSize: '0.65rem', marginLeft: 'auto' }}>Security Exploit PoC</span>
-                </div>
-                <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  The CyberSec Auditor Agent generated this exploit demonstration payload:
-                </p>
-                <pre style={{
-                  margin: 0,
-                  padding: '12px',
-                  backgroundColor: 'var(--bg-surface)',
-                  border: '1px solid rgba(255, 184, 105, 0.15)',
-                  borderRadius: 'var(--radius-md)',
-                  color: 'var(--tertiary)',
-                  fontFamily: 'Fira Code, monospace',
-                  fontSize: '0.825rem',
-                  lineHeight: 1.4,
-                  whiteSpace: 'pre-wrap',
-                  overflowX: 'auto'
-                }}>
-                  {scenario.pocExploit}
-                </pre>
-              </div>
+              <AttackReplay
+                pocExploit={scenario.pocExploit}
+                explanation={scenario.explanation}
+                cwe={scenario.cwe}
+                cvss={scenario.cvss}
+              />
             )}
 
             {/* Conversation timeline entry */}
