@@ -39,8 +39,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
       {/* Original Code Panel */}
       <div className="diff-panel">
         <div className="diff-header">
-          <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }}></span>
+          <span style={{ color: 'var(--tertiary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--tertiary)' }}></span>
             Vulnerable Code ({filename})
           </span>
           <span className="badge badge-red" style={{ fontSize: '0.7rem' }}>Original</span>
@@ -64,8 +64,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
       {/* Patched Code Panel */}
       <div className="diff-panel">
         <div className="diff-header">
-          <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }}></span>
+          <span style={{ color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--secondary)' }}></span>
             Secured Patch
           </span>
           <span className="badge badge-green" style={{ fontSize: '0.7rem' }}>Patched</span>
