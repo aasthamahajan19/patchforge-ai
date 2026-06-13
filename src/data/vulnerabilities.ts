@@ -1,7 +1,15 @@
 export interface AgentLog {
-  sender: 'developer' | 'auditor' | 'patcher' | 'automator' | 'system';
+  sender: 'developer' | 'auditor' | 'patcher' | 'automator' | 'system' | 'idle';
   message: string;
   delay: number; // Delay in ms before showing this log
+}
+
+export interface GeminiVulnerability {
+  id: string;
+  name: string;
+  severity: string;
+  cvss: number;
+  description: string;
 }
 
 export interface VulnerabilityScenario {
@@ -20,6 +28,7 @@ export interface VulnerabilityScenario {
   explanation: string;
   prSummary: string;
   agentLogs: AgentLog[];
+  vulnerabilities?: GeminiVulnerability[];
 }
 
 export const vulnerabilitiesData: VulnerabilityScenario[] = [

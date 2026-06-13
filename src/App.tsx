@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import type { VulnerabilityScenario, AgentLog } from './data/vulnerabilities';
+import type { VulnerabilityScenario, AgentLog, GeminiVulnerability } from './data/vulnerabilities';
 import { AgentActivity } from './components/AgentActivity';
 import { DiffViewer } from './components/DiffViewer';
 import { PullRequestView } from './components/PullRequestView';
@@ -17,10 +17,10 @@ const AGENT_META = {
 type AgentKey = keyof typeof AGENT_META;
 
 /* ─── Tiny helpers ──────────────────────────────────────── */
-const calcScore = (vulns: any[]) => {
+const calcScore = (vulns: GeminiVulnerability[]) => {
   if (!vulns || vulns.length === 0) return 95;
   const severityMap: Record<string, number> = { CRITICAL: 35, HIGH: 20, MEDIUM: 10, LOW: 5 };
-  const deductions = vulns.reduce((sum: number, v: any) => sum + (severityMap[v.severity] || 10), 0);
+  const deductions = vulns.reduce((sum, v) => sum + (severityMap[v.severity] || 10), 0);
   return Math.max(5, 100 - deductions);
 };
 
@@ -103,7 +103,7 @@ function SectionHeading({ children, sub }: { children: React.ReactNode; sub?: st
 function App() {
   const [activeTab, setActiveTab] = useState<'sandbox' | 'pr_hub'>('sandbox');
   const [inputMode, setInputMode] = useState<'prompt' | 'code' | 'github'>('prompt');
-  const [customPrompt, setCustomPrompt] = useState<string>('Write a Python web API that accepts an uploaded image path and runs a system command to resize it using ImageMagick.');
+  const [customPrompt, setCustomPrompt] = useState<string>('');
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [scanStatus, setScanStatus] = useState<'idle' | 'generating' | 'auditing' | 'patching' | 'automating' | 'completed'>('idle');
   const [activeLogs, setActiveLogs] = useState<AgentLog[]>([]);
@@ -119,7 +119,7 @@ function App() {
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [githubUrl, setGithubUrl] = useState('');
-  const [scanHistory, setScanHistory] = useState<{timestamp: string, vulnCount: number, scenario: any}[]>([]);
+  const [scanHistory, setScanHistory] = useState<{timestamp: string, vulnCount: number, scenario: VulnerabilityScenario}[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -131,25 +131,36 @@ function App() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  useEffect(() => {
-    setEditorCode(inputMode === 'prompt'
-      ? '// AI Developer is ready to code. Enter a prompt above and click "Run AI Agents"...'
-      : '// Paste your custom code snippet here to scan for vulnerabilities...\n\ndef get_user_data(user_id):\n    # Example of a syntax/security flaw:\n    # missing parenthesis, SQL query concatenation\n    query = "SELECT * FROM users WHERE id = " + user_id\n    return query\n');
-    setScanStatus('idle');
-    setActiveLogs([]);
-    setActiveAgent('idle');
-  }, [inputMode]);
+  const unescapeCodeString = (code: string): string => {
+    return code.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\\\/g, '\\').replace(/\\"/g, '"');
+  };
 
-  const callGemini = async (prompt: string): Promise<any> => {
+  const callGemini = async (prompt: string): Promise<Record<string, unknown>> => {
     const response = await fetch(
-      `https://generGenerativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) }
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json' },
+        }),
+      }
     );
     if (!response.ok) throw new Error(`Gemini API Error: Status ${response.status}`);
     const data = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const cleanJsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleanJsonStr);
+    try {
+      return JSON.parse(cleanJsonStr) as Record<string, unknown>;
+    } catch {
+      const firstBrace = cleanJsonStr.indexOf('{');
+      const lastBrace = cleanJsonStr.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        return JSON.parse(cleanJsonStr.slice(firstBrace, lastBrace + 1)) as Record<string, unknown>;
+      }
+      throw new Error('Could not parse JSON from Gemini response');
+    }
   };
 
   const runLiveAIScan = async () => {
@@ -173,9 +184,9 @@ function App() {
 
     let devCode = inputMode === 'code' ? editorCode : '';
     let devLanguage = 'txt';
-    let vulnerabilities: any[] = [];
+    let vulnerabilities: GeminiVulnerability[] = [];
     let pocExploit = '# Attacker Exploit payload or bug demo not generated';
-    let patchedCode = '';
+    let patchedCode: string;
     let patchExplanation = 'Remediated custom user code.';
     let prSummary = '### PatchForge Automated Security Audit\nApplied security patches to user-pasted code.';
     let compliance: string[] = ['OWASP Top 10', 'SOC 2 Compliance'];
@@ -199,12 +210,13 @@ function App() {
           let devPrompt = `You are an AI Developer Agent. A user requested: "${customPrompt}". Write complete, functional, and clean code for this request. Write it naturally as a regular developer would.`;
           if (promptMemoryAddition) devPrompt += `\n\n[PROACTIVE SECURITY CONTEXT LOADED FROM SESSION MEMORY]:${promptMemoryAddition}`;
           devPrompt += `\n\nReturn ONLY raw JSON, no markdown fences, matching exactly:\n{\n  "code": "the complete source code as a string, with real newlines escaped as \\n",\n  "language": "the programming language, e.g. python, javascript, go"\n}`;
-          const devResult = await callGemini(devPrompt);
-          devCode = devResult.code || '// No code returned';
-          devLanguage = devResult.language || 'txt';
-        } catch (e: any) {
-          appendLog('system', `⚠️ Developer Agent error: ${e.message}. Using fallback placeholder code.`, 2000);
-          devCode = `// Developer Agent failed to generate code for: ${customPrompt}\n// Error: ${e.message}`;
+          const devResult = (await callGemini(devPrompt)) as Record<string, unknown>;
+          devCode = unescapeCodeString(String(devResult.code || '// No code returned'));
+          devLanguage = String(devResult.language || 'txt');
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          appendLog('system', `⚠️ Developer Agent error: ${msg}. Using fallback placeholder code.`, 2000);
+          devCode = `// Developer Agent failed to generate code for: ${customPrompt}\n// Error: ${msg}`;
         }
         setEditorCode(devCode);
         appendLog('developer', '💻 Developer Agent: Code generation complete. Output sent to workspace.', 3000);
@@ -221,22 +233,23 @@ function App() {
       appendLog('auditor', '🔍 Auditor Agent activated. Scanning source for security flaws, syntax bugs & logic errors...', 2800);
 
       try {
-        const auditResult = await callGemini(
+        const auditResult = (await callGemini(
           `You are an Auditor Agent. Review the following code for security vulnerabilities, syntax issues, and runtime logic errors:\n\n${devCode}\n\nIdentify any security vulnerabilities (SQL Injection, Path Traversal, Command Injection, Hardcoded Credentials, etc) or critical quality flaws. Return ONLY raw JSON, no markdown fences, matching exactly:\n{\n  "language": "python, javascript, go, etc",\n  "vulnerabilities": [\n    {\n      "id": "CWE-XXX",\n      "name": "Name of vulnerability or bug",\n      "severity": "CRITICAL/HIGH/MEDIUM",\n      "cvss": 9.8,\n      "description": "Details of the vulnerability or bug found"\n    }\n  ],\n  "pocExploit": "A shell script, curl command, or code snippet showing how this bug/exploit behaves, as a string with \\n for newlines",\n  "compliance": ["OWASP A03:2021-Injection", "SOC 2 CC6.6"]\n}`
-        );
-        vulnerabilities = auditResult.vulnerabilities || [];
-        pocExploit = auditResult.pocExploit || pocExploit;
-        compliance = auditResult.compliance || compliance;
-        if (auditResult.language) devLanguage = auditResult.language;
-      } catch (e: any) {
-        appendLog('system', `⚠️ Auditor Agent error: ${e.message}. Proceeding with no findings.`, 3500);
+        )) as Record<string, unknown>;
+        vulnerabilities = (auditResult.vulnerabilities as GeminiVulnerability[]) || [];
+        pocExploit = String(auditResult.pocExploit || pocExploit);
+        compliance = (auditResult.compliance as string[]) || compliance;
+        if (auditResult.language) devLanguage = String(auditResult.language);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        appendLog('system', `⚠️ Auditor Agent error: ${msg}. Proceeding with no findings.`, 3500);
       }
 
       if (vulnerabilities.length > 0) {
-        vulnerabilities.forEach((v: any) => appendLog('auditor', `🚨 [${v.severity}] ${v.name} (${v.id}): ${v.description}`, 4500));
+        vulnerabilities.forEach((v) => appendLog('auditor', `🚨 [${v.severity}] ${v.name} (${v.id}): ${v.description}`, 4500));
         setVulnerabilityHistory((prev) => {
           const updated = [...prev];
-          vulnerabilities.forEach((v: any) => { if (v.id && !updated.includes(v.id)) updated.push(v.id); });
+          vulnerabilities.forEach((v) => { if (v.id && !updated.includes(v.id)) updated.push(v.id); });
           return updated;
         });
       } else {
@@ -261,11 +274,12 @@ function App() {
           let patchPrompt = `You are an Auto-Patcher Agent. This ${devLanguage} code has vulnerabilities or bugs:\n\n${devCode}\n\nThe Auditor Agent found these issues:\n${JSON.stringify(vulnerabilities)}`;
           if (promptMemoryAddition) patchPrompt += `\n\n[PROACTIVE SECURITY CONTEXT LOADED FROM SESSION MEMORY]:${promptMemoryAddition}`;
           patchPrompt += `\n\nRewrite the code to fix ALL listed vulnerabilities, syntax bugs, and logic errors while keeping the original functionality intact. Return ONLY raw JSON, no markdown fences, matching exactly:\n{\n  "patchedCode": "the complete fixed source code as a string, with real newlines escaped as \\n",\n  "explanation": "brief explanation of what was changed and why, 2-3 sentences"\n}`;
-          const patchResult = await callGemini(patchPrompt);
-          patchedCode = patchResult.patchedCode || devCode;
-          patchExplanation = patchResult.explanation || patchExplanation;
-        } catch (e: any) {
-          appendLog('system', `⚠️ Patcher Agent error: ${e.message}. Showing original code as unpatched.`, 7000);
+          const patchResult = (await callGemini(patchPrompt)) as Record<string, unknown>;
+          patchedCode = unescapeCodeString(String(patchResult.patchedCode || devCode));
+          patchExplanation = String(patchResult.explanation || patchExplanation);
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          appendLog('system', `⚠️ Patcher Agent error: ${msg}. Showing original code as unpatched.`, 7000);
           patchedCode = devCode;
         }
       } else {
@@ -280,19 +294,19 @@ function App() {
       appendLog('system', '⚙️ Sandboxed Compiler: Initiating compile validation check on patched code...', 9000);
       await new Promise((r) => setTimeout(r, 1000));
 
-      const hasSyntaxError = vulnerabilities.some((v: any) => v.id === 'SYNTAX-ERR' || v.id === 'SYNTAX_ERROR' || v.id?.toLowerCase().includes('syntax'));
+      const hasSyntaxError = vulnerabilities.some((v) => v.id === 'SYNTAX-ERR' || v.id === 'SYNTAX_ERROR' || v.id?.toLowerCase().includes('syntax'));
       if (hasSyntaxError) {
         appendLog('system', '⚙️ Sandboxed Compiler: Detected SyntaxError. Initiating self-correction loop 1/2...', 10000);
         await new Promise((r) => setTimeout(r, 1500));
         try {
           const correctionPrompt = `You are a code refactoring assistant. A previously generated secure patch failed compilation check.\n\nHere is the compiler/linter error:\nSyntaxError: Unexpected token or invalid syntax in file\n\nHere is the faulty patched code:\n${patchedCode}\n\nPlease fix the compile/syntax errors while keeping security patches intact. Return ONLY raw JSON:\n{\n  "patchedCode": "the corrected code string",\n  "explanation": "description of syntax corrections"\n}`;
-          const correctionResult = await callGemini(correctionPrompt);
+          const correctionResult = (await callGemini(correctionPrompt)) as Record<string, unknown>;
           if (correctionResult.patchedCode) {
-            patchedCode = correctionResult.patchedCode;
-            patchExplanation = correctionResult.explanation || patchExplanation;
+            patchedCode = unescapeCodeString(String(correctionResult.patchedCode));
+            patchExplanation = String(correctionResult.explanation || patchExplanation);
             appendLog('system', '⚙️ Sandboxed Compiler: Self-correction successful! Staged corrected code.', 11500);
           }
-        } catch (_) {
+        } catch {
           appendLog('system', '⚙️ Sandboxed Compiler warning: Sandbox compiler self-correction API failed. Proceeding with caution.', 11500);
         }
         await new Promise((r) => setTimeout(r, 1000));
@@ -313,11 +327,11 @@ function App() {
       await new Promise((r) => setTimeout(r, 800));
 
       try {
-        const prResult = await callGemini(
+        const prResult = (await callGemini(
           `You are a Git Automator Agent. Write a GitHub Pull Request description in Markdown summarizing this fix.\n\nIssues found:\n${JSON.stringify(vulnerabilities)}\n\nFix applied:\n${patchExplanation}\n\nReturn ONLY raw JSON, no markdown fences, matching exactly:\n{\n  "prSummary": "markdown formatted PR description with headings like ### Summary, ### Issues Found, ### Changes Made, using \\n for newlines"\n}`
-        );
-        prSummary = prResult.prSummary || prSummary;
-      } catch (_) { /* use default */ }
+        )) as Record<string, unknown>;
+        prSummary = String(prResult.prSummary || prSummary);
+      } catch { /* use default */ }
 
       appendLog('automator', '🌿 Created staging branch: `patchforge-secure-live-patch` and staged files.', 14500);
       appendLog('automator', '💾 Created commit and opened Pull Request with report.', 15500);
@@ -329,7 +343,7 @@ function App() {
         prompt: inputMode === 'prompt' ? customPrompt : 'User-pasted custom code block',
         language: devLanguage,
         cwe: vulnerabilities[0] ? `${vulnerabilities[0].id}: ${vulnerabilities[0].name}` : 'CWE-000: Custom Code Scan',
-        severity: vulnerabilities[0]?.severity || 'MEDIUM',
+        severity: (vulnerabilities[0]?.severity as 'CRITICAL' | 'HIGH' | 'MEDIUM') || 'MEDIUM',
         cvss: vulnerabilities[0]?.cvss || 0,
         compliance,
         pocExploit,
@@ -347,20 +361,25 @@ function App() {
       setActiveAgent('idle');
 
       try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        [523.25, 659.25, 783.99].forEach((freq, i) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain); gain.connect(ctx.destination);
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.12);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.15);
-          osc.start(ctx.currentTime + i * 0.12);
-          osc.stop(ctx.currentTime + i * 0.12 + 0.2);
-        });
-      } catch (_) {}
-    } catch (err: any) {
-      appendLog('system', `❌ Pipeline error: ${err.message}`, 0);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const CtxClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (CtxClass) {
+          const ctx = new CtxClass();
+          [523.25, 659.25, 783.99].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.12);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.15);
+            osc.start(ctx.currentTime + i * 0.12);
+            osc.stop(ctx.currentTime + i * 0.12 + 0.2);
+          });
+        }
+      } catch { /* audio not available */ }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      appendLog('system', `❌ Pipeline error: ${msg}`, 0);
       setScanStatus('idle');
       setActiveAgent('idle');
     } finally {
@@ -878,7 +897,7 @@ function App() {
               <div className="glass-panel" style={{ padding: '60px 40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                 <div style={{ fontSize: '3rem', marginBottom: 16 }}>📂</div>
                 <h3 style={{ margin: '0 0 10px 0', fontFamily: 'Space Grotesk, sans-serif', color: 'var(--text-secondary)' }}>No Open Pull Requests</h3>
-                <p style={{ margin: 0, fontSize: '0.88rem', maxWidth: 380, margin: '0 auto', lineHeight: 1.6 }}>
+                <p style={{ margin: '0 auto', fontSize: '0.88rem', maxWidth: 380, lineHeight: 1.6 }}>
                   Go to <strong>Labs</strong>, enter a prompt or paste code, and click "Run AI Agents" to generate a security patch PR.
                 </p>
                 <button onClick={() => setActiveTab('sandbox')} className="btn-secondary" style={{ marginTop: 24, fontSize: '0.85rem' }}>
