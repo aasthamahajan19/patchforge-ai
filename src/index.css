@@ -400,3 +400,94 @@ code, pre, .font-mono {
     grid-template-columns: 1fr;
   }
 }
+
+/* Security Memory Widget Styling */
+.security-memory-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+
+.security-memory-card {
+  background: rgba(28, 27, 27, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all 0.3s ease;
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.6);
+}
+
+.security-memory-card:hover {
+  border-color: rgba(208, 188, 255, 0.25);
+}
+
+.security-memory-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--primary);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.memory-active-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--primary);
+  box-shadow: 0 0 8px var(--primary);
+  animation: memory-glow 2s infinite alternate;
+}
+
+@keyframes memory-glow {
+  from {
+    opacity: 0.4;
+    box-shadow: 0 0 2px var(--primary);
+  }
+  to {
+    opacity: 1;
+    box-shadow: 0 0 10px var(--primary);
+  }
+}
+
+.memory-insight-item {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  padding: 10px;
+  background: rgba(208, 188, 255, 0.04);
+  border-left: 2px solid var(--primary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  animation: slide-up-fade 0.3s ease-out;
+}
+
+.memory-insight-warning {
+  border-left-color: var(--tertiary);
+  background: rgba(255, 184, 105, 0.04);
+}
+
+.memory-badge-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.memory-badge-item {
+  font-size: 0.7rem;
+  padding: 4px 8px;
+  border-radius: 9999px;
+  background: var(--bg-surface);
+  border: 1px solid var(--outline-variant);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

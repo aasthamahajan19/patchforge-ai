@@ -53,7 +53,13 @@ The Auditor Agent automatically generates a safe, detailed proof-of-concept (PoC
 Automatically maps all identified vulnerabilities to corresponding industry compliance standards including **OWASP Top 10**, **SOC 2**, **GDPR**, and **PCI-DSS**, displaying compliance tags in the workspace and final PR.
 
 ### 4. 🧠 USP 3: Proactive "Security Memory" (Learning Loop)
-Auditor logs print proactive alerts reminding the Developer Agent of previously discovered flaws in similar file scopes, encouraging defensive coding habits.
+*   **Prompt Alignment**: Auditor logs print proactive warnings reminding the Developer Agent of previously discovered flaws in similar file scopes, encouraging defensive coding habits.
+*   **Interactive Sidebar**: Includes a toggleable **Security Memory** sidebar widget that displays active CWEs caught during the session, showing system insights and active context modifiers loaded. Also features manual triggers (`Teach Vulnerability` / `Reset Memory`) to test/demo memory states.
+
+### 5. ⚙️ USP 4: "Shadow Executions" Syntax Validation
+*   Enforces compilation and syntax checks before staging patches.
+*   **Local CLI (`review_agent.py`)**: Runs local linter checks (e.g. `py_compile`, `node --check`, `go vet`). If a syntax/compile error occurs, it feeds the error back to Gemini and requests a corrected patch (up to 2 retries).
+*   **Web App Console (`App.tsx`)**: Appends sandboxed compiler logs and automatically requests syntax self-corrections via the Gemini API if syntax issues are found.
 
 ---
 

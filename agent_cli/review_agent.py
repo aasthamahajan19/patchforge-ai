@@ -240,6 +240,105 @@ Here is the code:
         print(f"[-] Live AI API Call failed: {str(e)}")
         return None
 
+def validate_patched_syntax(code, filename):
+    import tempfile
+    ext = os.path.splitext(filename)[1]
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+        tmp.write(code.encode('utf-8'))
+        tmp_name = tmp.name
+        
+    try:
+        if ext == '.py':
+            res = subprocess.run([sys.executable, '-m', 'py_compile', tmp_name], 
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if res.returncode != 0:
+                err_msg = res.stderr.decode('utf-8').replace(tmp_name, filename)
+                return False, err_msg
+            return True, ""
+        elif ext == '.js':
+            try:
+                res = subprocess.run(['node', '--check', tmp_name], 
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if res.returncode != 0:
+                    err_msg = res.stderr.decode('utf-8').replace(tmp_name, filename)
+                    return False, err_msg
+            except FileNotFoundError:
+                pass
+            return True, ""
+        elif ext == '.go':
+            try:
+                res = subprocess.run(['go', 'vet', tmp_name], 
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if res.returncode != 0:
+                    err_msg = res.stderr.decode('utf-8').replace(tmp_name, filename)
+                    return False, err_msg
+            except FileNotFoundError:
+                pass
+            return True, ""
+        return True, ""
+    finally:
+        if os.path.exists(tmp_name):
+            os.remove(tmp_name)
+
+def run_live_ai_correction(api_key, faulty_code, compile_error, filename):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    
+    prompt = f"""You are a code refactoring assistant. A previously generated secure patch for file "{filename}" failed compilation or syntax check.
+
+Here is the compiler/linter error message:
+---
+{compile_error}
+---
+
+Here is the faulty patched code:
+---
+{faulty_code}
+---
+
+Please fix the compile/syntax errors in the code. Ensure it retains the security fixes, is syntactically valid, and matches the target programming language.
+
+Return your response strictly in the following JSON format:
+{{
+  "patchedCode": "The complete corrected and compile-ready code",
+  "explanation": "Brief description of the syntax corrections made"
+}}
+Return only the raw JSON. Do not wrap the JSON in markdown code blocks."""
+
+    data = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt}
+                ]
+            }
+        ]
+    }
+    
+    try:
+        req = urllib.request.Request(
+            url, 
+            data=json.dumps(data).encode("utf-8"), 
+            headers=headers,
+            method="POST"
+        )
+        with urllib.request.urlopen(req) as response:
+            res_data = response.read().decode("utf-8")
+            res_json = json.loads(res_data)
+            text_output = res_json["candidates"][0]["content"]["parts"][0]["text"].strip()
+            
+            if text_output.startswith("```json"):
+                text_output = text_output[7:]
+            if text_output.endswith("```"):
+                text_output = text_output[:-3]
+            text_output = text_output.strip()
+            
+            result = json.loads(text_output)
+            return result
+    except Exception as e:
+        print(f"[-] Live AI self-correction API Call failed: {str(e)}")
+        return None
+
 def main():
     parser = argparse.ArgumentParser(description="PatchForge AI: Local Vulnerability Auditing & Patching Agent")
     parser.add_argument("file", help="Path to the source file to review")
@@ -273,6 +372,30 @@ def main():
             vulnerabilities = ai_result.get("vulnerabilities", [])
             patched_code = ai_result.get("patchedCode")
             ai_explanation = ai_result.get("explanation")
+            
+            if patched_code:
+                print("[*] Agent 2.5 (Shadow Execution) validating patch syntax...")
+                is_valid, err_msg = validate_patched_syntax(patched_code, filename)
+                
+                # Self-correction loop: retry up to 2 times
+                retries = 0
+                while not is_valid and retries < 2:
+                    retries += 1
+                    print(f"[!] Syntax validation failed (Attempt {retries}/2). Error:\n{err_msg}")
+                    print("[*] Initiating AI self-correction loop...")
+                    
+                    corrected_result = run_live_ai_correction(api_key, patched_code, err_msg, filename)
+                    if corrected_result:
+                        patched_code = corrected_result.get("patchedCode", patched_code)
+                        ai_explanation = corrected_result.get("explanation", ai_explanation)
+                        is_valid, err_msg = validate_patched_syntax(patched_code, filename)
+                    else:
+                        break
+                        
+                if is_valid:
+                    print("[+] Shadow Execution: Syntax check passed successfully (0 errors).")
+                else:
+                    print("[!] Shadow Execution warning: Patch still contains compile/syntax warnings.")
         else:
             print("[!] Live scan failed. Falling back to local rules engine.")
             vulnerabilities = run_local_audit(content, filename)
