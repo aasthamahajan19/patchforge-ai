@@ -70,6 +70,7 @@ Automatically maps all identified vulnerabilities to corresponding industry comp
 *   `src/components/AgentActivity.tsx`: Agent terminal output console and reasoning timelines.
 *   `src/components/DiffViewer.tsx`: Dynamic line-by-line code difference highlighting.
 *   `src/components/PullRequestView.tsx`: Pull Request details page and merge action center.
+*   `src/components/AttackReplay.tsx`: Reusable exploit replay and remediation summary card.
 *   `agent_cli/review_agent.py`: Standalone CLI python script.
 
 ---
