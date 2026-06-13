@@ -74,8 +74,8 @@ export const PullRequestView: React.FC<PullRequestViewProps> = ({
           <span className="badge badge-orange" style={{ fontSize: '0.65rem' }}>
             CVSS: {scenario.cvss}
           </span>
-          {scenario.compliance && scenario.compliance.map((c) => (
-            <span key={c} className="badge badge-gray" style={{ fontSize: '0.65rem' }}>
+          {scenario.compliance.map((c, idx) => (
+            <span key={`${c}-${idx}`} className="badge badge-gray" style={{ fontSize: '0.65rem' }}>
               🛡️ {c}
             </span>
           ))}
