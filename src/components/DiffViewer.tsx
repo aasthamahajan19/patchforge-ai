@@ -8,31 +8,16 @@ interface DiffViewerProps {
 }
 
 export const DiffViewer: React.FC<DiffViewerProps> = ({
-  scenarioId,
   originalCode,
   patchedCode,
   filename,
 }) => {
-  const getHighlights = (id: string) => {
-    switch (id) {
-      case 'js_sql_injection':
-        return { vuln: [13, 15], patched: [13, 19] }; // 0-indexed line numbers
-      case 'py_path_traversal':
-        return { vuln: [13, 14], patched: [13, 21] };
-      case 'go_cmd_injection':
-        return { vuln: [15, 19], patched: [15, 29] };
-      case 'secrets_leakage':
-        return { vuln: [3, 4], patched: [4, 6] };
-      default:
-        // Generic fallback highlight for user-pasted code
-        return { vuln: [0, 2], patched: [0, 2] };
-    }
-  };
-
-  const { vuln, patched } = getHighlights(scenarioId);
-
   const originalLines = originalCode.split('\n');
   const patchedLines = patchedCode.split('\n');
+
+  // Create lookup sets of trimmed lines to identify added/removed lines dynamically
+  const originalSet = new Set(originalLines.map(line => line.trim()));
+  const patchedSet = new Set(patchedLines.map(line => line.trim()));
 
   return (
     <div className="diff-container" style={{ flex: 1, minHeight: 0 }}>
@@ -47,11 +32,12 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         </div>
         <pre className="diff-content">
           {originalLines.map((line, index) => {
-            const isVuln = index >= vuln[0] && index <= vuln[1];
+            // Highlight as removed if the line is not empty and does not exist in the patched code
+            const isRemoved = line.trim() !== '' && !patchedSet.has(line.trim());
             return (
               <div
                 key={index}
-                className={`diff-line ${isVuln ? 'removed' : ''}`}
+                className={`diff-line ${isRemoved ? 'removed' : ''}`}
               >
                 <span className="diff-line-number">{index + 1}</span>
                 <span>{line || ' '}</span>
@@ -72,11 +58,12 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         </div>
         <pre className="diff-content">
           {patchedLines.map((line, index) => {
-            const isPatched = index >= patched[0] && index <= patched[1];
+            // Highlight as added if the line is not empty and does not exist in the original code
+            const isAdded = line.trim() !== '' && !originalSet.has(line.trim());
             return (
               <div
                 key={index}
-                className={`diff-line ${isPatched ? 'added' : ''}`}
+                className={`diff-line ${isAdded ? 'added' : ''}`}
               >
                 <span className="diff-line-number">{index + 1}</span>
                 <span>{line || ' '}</span>
