@@ -170,6 +170,7 @@ function App() {
     setScanStatus('generating');
     setActiveAgent('developer');
     setIsMerged(false);
+    setChatMessages([]);
 
     const appendLog = (sender: AgentKey, message: string, delay: number) => {
       setActiveLogs((prev) => [...prev, { sender, message, delay }]);
@@ -406,7 +407,14 @@ function App() {
 
   const fetchGithubFile = async () => {
     try {
-      const raw = githubUrl.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
+      let raw = githubUrl.trim();
+      if (!raw) return;
+      if (raw.includes('github.com')) {
+        raw = raw.replace('github.com', 'raw.githubusercontent.com');
+        raw = raw.replace('/blob/', '/');
+        raw = raw.replace('/raw/', '/');
+        raw = raw.replace('/tree/', '/');
+      }
       const res = await fetch(raw);
       if (!res.ok) throw new Error('Fetch failed');
       setEditorCode(await res.text());
