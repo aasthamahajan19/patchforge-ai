@@ -460,7 +460,7 @@ function App() {
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--bg-surface)' }}>
 
       {/* ── Header ─────────────────────────────────────── */}
-      <header style={{
+      <header className="app-header" style={{
         padding: '0 32px',
         height: 64,
         display: 'flex',
@@ -566,7 +566,7 @@ function App() {
             )}
 
             {/* Mode switcher row */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div className="mode-switcher-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div style={{ display: 'flex', gap: 6, background: 'var(--bg-node)', padding: 5, borderRadius: 9999, border: '1px solid var(--outline-variant)' }}>
                 <ModeTab active={inputMode === 'prompt'} onClick={() => setInputMode('prompt')}>🧪 Generate from Prompt</ModeTab>
                 <ModeTab active={inputMode === 'code'} onClick={() => setInputMode('code')}>📝 Audit My Code</ModeTab>
@@ -598,7 +598,7 @@ function App() {
 
             {/* GitHub URL bar */}
             {inputMode === 'github' && (
-              <div className="glass-panel" style={{ padding: '14px 18px', borderLeft: '3px solid var(--secondary)', display: 'flex', gap: 10, alignItems: 'center' }}>
+              <div className="glass-panel github-url-bar" style={{ padding: '14px 18px', borderLeft: '3px solid var(--secondary)', display: 'flex', gap: 10, alignItems: 'center' }}>
                 <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontFamily: 'Space Grotesk, sans-serif' }}>GitHub URL</span>
                 <input
                   value={githubUrl}
@@ -633,7 +633,7 @@ function App() {
             )}
 
             {/* 3-column workspace workspace grid structure dynamically adjusted */}
-            <div style={{ display: 'grid', gridTemplateColumns: showMemoryPanel ? '220px 1fr 1fr' : '1fr 1fr', gap: 16, alignItems: 'start' }}>
+            <div className="workspace-layout-grid" style={{ display: 'grid', gridTemplateColumns: showMemoryPanel ? '220px 1fr 1fr' : '1fr 1fr', gap: 16, alignItems: 'start' }}>
 
               {/* Security Memory */}
               {showMemoryPanel && (
@@ -746,7 +746,7 @@ function App() {
             </div>
 
             {/* Action Bar */}
-            <div style={{
+            <div className="action-bar" style={{
               padding: '14px 20px',
               background: 'var(--bg-stage)',
               border: '1px solid var(--outline-variant)',
@@ -780,7 +780,7 @@ function App() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 18, animation: 'slide-up-fade 0.4s ease-out' }}>
 
                 {/* Intercept banner */}
-                <div style={{
+                <div className="intercept-banner" style={{
                   padding: '16px 22px',
                   background: 'rgba(255,184,105,0.06)',
                   border: '1px solid rgba(255,184,105,0.3)',

@@ -491,3 +491,86 @@ code, pre, .font-mono {
   align-items: center;
   gap: 4px;
 }
+
+/* ─── Mobile Responsiveness Media Queries ────────────────── */
+@media (max-width: 900px) {
+  .workspace-layout-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .mode-switcher-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  .mode-switcher-row > div {
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .mode-switcher-row button {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    height: auto !important;
+    padding: 16px !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+    align-items: center !important;
+    text-align: center;
+  }
+
+  .app-header > div {
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .intercept-banner {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 16px !important;
+    text-align: center;
+  }
+
+  .intercept-banner > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  main {
+    padding: 16px !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .action-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 14px !important;
+    text-align: center;
+  }
+
+  .action-bar button {
+    width: 100% !important;
+  }
+
+  .github-url-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  .github-url-bar button {
+    width: 100%;
+  }
+}
